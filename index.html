@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dora Training Log Dashboard</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for beautiful charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- jsPDF and html2canvas for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        /* Custom styles for a modern, dark dashboard theme */
+        body {
+            background-color: #111827; /* dark gray */
+            color: #f3f4f6; /* light gray */
+            font-family: 'Inter', sans-serif;
+        }
+        @import url('https://rsms.me/inter/inter.css');
+        .chart-container {
+            background-color: #1f2937; /* slightly lighter gray */
+            border: 1px solid #374151; /* even lighter gray for border */
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .chart-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+        }
+        .btn {
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+        }
+        /* Style for PDF export to ensure background is white */
+        .export-pdf {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
+        .export-pdf .chart-container {
+             background-color: #ffffff !important;
+             border: 1px solid #e5e7eb;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-6 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+
+        <!-- Header Section -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl sm:text-5xl font-bold text-white tracking-tight">Dora Training Log Dashboard</h1>
+            <p class="mt-2 text-lg text-gray-400">Paste your log data below to dynamically generate interactive charts.</p>
+        </header>
+
+        <!-- Input and Controls Section -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-lg mb-8">
+            <div id="url-status" class="mb-4 text-sm text-gray-400 rounded-md p-3 bg-gray-900 border border-gray-700"></div>
+            <label for="logInput" class="block text-sm font-medium text-gray-300 mb-2">Log Data:</label>
+            <textarea id="logInput" rows="10" class="w-full p-3 bg-gray-900 text-gray-200 border border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"></textarea>
+            <div class="mt-4 flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
+                <button id="generateBtn" class="btn w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-md">
+                    Generate Dashboard
+                </button>
+                <button id="savePdfBtn" class="btn w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md">
+                    Save as PDF
+                </button>
+            </div>
+        </div>
+        
+        <!-- Loading Spinner -->
+        <div id="loading" class="hidden text-center my-10">
+            <svg class="animate-spin h-8 w-8 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-2 text-gray-400">Generating PDF...</p>
+        </div>
+
+
+        <!-- Charts Dashboard Section -->
+        <div id="dashboard" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <!-- Charts will be dynamically inserted here -->
+        </div>
+
+    </div>
+
+    <script>
+        // --- Sample Data ---
+        const sampleLogData = `[09-24 15:25:22][flashy.solver][INFO] - Valid Summary | Epoch 14 | tf_loudnessratio=-0.010 | wm_detection_identity=0.836 | pesq=4.532 | max_mem=15.623 | l1=0.001 | mel=0.002 | sisnr=-34.940
+[09-24 15:45:10][flashy.solver][INFO] - Valid Summary | Epoch 15 | tf_loudnessratio=-0.012 | wm_detection_identity=0.845 | pesq=4.550 | max_mem=15.680 | l1=0.001 | mel=0.002 | sisnr=-33.510
+[09-24 16:05:30][flashy.solver][INFO] - Valid Summary | Epoch 16 | tf_loudnessratio=-0.011 | wm_detection_identity=0.851 | pesq=4.561 | max_mem=15.710 | l1=0.000 | mel=0.000 | sisnr=-32.823
+[09-24 16:25:05][flashy.solver][INFO] - Valid Summary | Epoch 17 | tf_loudnessratio=-0.009 | wm_detection_identity=0.859 | pesq=4.575 | max_mem=15.750 | l1=0.000 | mel=0.000 | sisnr=-31.995
+[09-24 16:45:55][flashy.solver][INFO] - Valid Summary | Epoch 18 | tf_loudnessratio=-0.008 | wm_detection_identity=0.863 | pesq=4.582 | max_mem=15.801 | l1=0.000 | mel=0.000 | sisnr=-30.150`;
+        document.getElementById('logInput').value = sampleLogData;
+
+        // --- Global Variables ---
+        let charts = []; // To keep track of chart instances for destruction
+        const generateBtn = document.getElementById('generateBtn');
+        const savePdfBtn = document.getElementById('savePdfBtn');
+        const dashboard = document.getElementById('dashboard');
+        const logInput = document.getElementById('logInput');
+        const loadingSpinner = document.getElementById('loading');
+        const urlStatusDiv = document.getElementById('url-status');
+
+
+        // --- Chart Color Palette ---
+        const chartColors = [
+            '#3498db', '#e74c3c', '#9b59b6', '#2ecc71', '#f1c40f', 
+            '#1abc9c', '#d35400', '#34495e', '#c0392b', '#8e44ad'
+        ];
+
+        /**
+         * Parses the raw log text into a structured data object for charting.
+         * @param {string} logText - The raw text from the textarea.
+         * @returns {object} An object containing labels (epochs) and datasets.
+         */
+        const parseLogs = (logText) => {
+            const lines = logText.split('\n').filter(line => line.includes('Valid Summary'));
+            const data = {
+                labels: [],
+                datasets: {}
+            };
+
+            lines.forEach(line => {
+                const epochMatch = line.match(/Epoch\s+(\d+)/);
+                if (!epochMatch) return;
+
+                const epoch = parseInt(epochMatch[1], 10);
+                data.labels.push(epoch);
+
+                const parts = line.split('|').slice(2); // Skip timestamp and Epoch part
+                parts.forEach(part => {
+                    const kv = part.trim().split('=');
+                    if (kv.length === 2) {
+                        const key = kv[0].trim();
+                        const value = parseFloat(kv[1]);
+                        if (!isNaN(value)) {
+                            if (!data.datasets[key]) {
+                                data.datasets[key] = [];
+                            }
+                            // This logic assumes logs are ordered, which they should be.
+                            // For robustness, one could match data points to epochs more explicitly.
+                            data.datasets[key].push(value);
+                        }
+                    }
+                });
+            });
+            
+            // Sort labels and corresponding data points to handle out-of-order logs
+            const sortedIndices = data.labels.map((_, i) => i).sort((a, b) => data.labels[a] - data.labels[b]);
+            data.labels.sort((a, b) => a - b);
+            for (const key in data.datasets) {
+                data.datasets[key] = sortedIndices.map(i => data.datasets[key][i]);
+            }
+
+            return data;
+        };
+        
+        /**
+         * Creates and renders charts on the dashboard based on parsed data.
+         * @param {object} data - The structured data from parseLogs.
+         */
+        const createDashboard = (data) => {
+            // Destroy old charts before creating new ones
+            charts.forEach(chart => chart.destroy());
+            charts = [];
+            dashboard.innerHTML = '';
+
+            if (Object.keys(data.datasets).length === 0) {
+                 dashboard.innerHTML = `<div class="col-span-1 md:col-span-2 xl:col-span-3 text-center py-10"><p class="text-gray-400">No valid data found to create charts. Please check the log format.</p></div>`;
+                 return;
+            }
+
+            let colorIndex = 0;
+            for (const key in data.datasets) {
+                const chartWrapper = document.createElement('div');
+                chartWrapper.className = 'chart-container';
+
+                const canvas = document.createElement('canvas');
+                chartWrapper.appendChild(canvas);
+                dashboard.appendChild(chartWrapper);
+
+                const chartColor = chartColors[colorIndex % chartColors.length];
+                colorIndex++;
+
+                const newChart = new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            label: key,
+                            data: data.datasets[key],
+                            borderColor: chartColor,
+                            backgroundColor: chartColor + '33', // semi-transparent fill
+                            fill: true,
+                            tension: 0.3,
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointBackgroundColor: chartColor,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    color: '#e5e7eb', // legend text color
+                                    font: { size: 14 }
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: key.replace(/_/g, ' ').toUpperCase(), // Format title
+                                color: '#f9fafb', // title text color
+                                font: { size: 18, weight: 'bold' }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Epoch',
+                                    color: '#9ca3af',
+                                    font: { size: 12 }
+                                },
+                                ticks: { color: '#9ca3af' },
+                                grid: { color: '#374151' }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Value',
+                                    color: '#9ca3af',
+                                    font: { size: 12 }
+                                },
+                                ticks: { color: '#9ca3af' },
+                                grid: { color: '#374151' }
+                            }
+                        }
+                    }
+                });
+                charts.push(newChart);
+            }
+        };
+
+        /**
+         * Captures the dashboard element and saves it as a PDF file.
+         */
+        const saveAsPdf = async () => {
+            if (dashboard.children.length === 0) {
+                alert("Please generate the dashboard first before saving as PDF.");
+                return;
+            }
+
+            loadingSpinner.classList.remove('hidden');
+            document.body.classList.add('export-pdf');
+
+            // Give the browser a moment to apply the class change
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            try {
+                const canvas = await html2canvas(dashboard, { 
+                    scale: 2, // Increase resolution for better quality
+                    useCORS: true 
+                });
+                
+                const imgData = canvas.toDataURL('image/png');
+                const { jsPDF } = window.jspdf;
+                
+                // Determine PDF orientation based on dashboard width
+                const pdf = dashboard.scrollWidth > dashboard.scrollHeight 
+                    ? new jsPDF('l', 'mm', 'a4') 
+                    : new jsPDF('p', 'mm', 'a4');
+                
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                const canvasWidth = canvas.width;
+                const canvasHeight = canvas.height;
+                const ratio = canvasWidth / canvasHeight;
+
+                let imgWidth = pdfWidth - 20; // with margin
+                let imgHeight = imgWidth / ratio;
+
+                if (imgHeight > pdfHeight - 20) {
+                    imgHeight = pdfHeight - 20;
+                    imgWidth = imgHeight * ratio;
+                }
+                
+                const x = (pdfWidth - imgWidth) / 2;
+                const y = (pdfHeight - imgHeight) / 2;
+
+                pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
+                pdf.save('dora_training_dashboard.pdf');
+            } catch (error) {
+                console.error("Error generating PDF:", error);
+                alert("An error occurred while generating the PDF. Please check the console for details.");
+            } finally {
+                document.body.classList.remove('export-pdf');
+                loadingSpinner.classList.add('hidden');
+            }
+        };
+
+        // --- Event Listeners ---
+        generateBtn.addEventListener('click', () => {
+            const data = parseLogs(logInput.value);
+            createDashboard(data);
+        });
+
+        savePdfBtn.addEventListener('click', saveAsPdf);
+
+        // --- Initial Load ---
+        /**
+         * Checks for a 'logFile' URL parameter on page load.
+         * If found, it fetches the log file from the URL.
+         * Otherwise, it loads the default sample data.
+         */
+        const loadInitialData = async () => {
+            const params = new URLSearchParams(window.location.search);
+            const logFileUrl = params.get('logFile');
+
+            if (logFileUrl) {
+                urlStatusDiv.textContent = `Attempting to load log file from: ${logFileUrl}`;
+                try {
+                    const response = await fetch(logFileUrl);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const logText = await response.text();
+                    logInput.value = logText;
+                    urlStatusDiv.textContent = `Successfully loaded data from: ${logFileUrl}`;
+                    urlStatusDiv.classList.add('text-green-400');
+
+                } catch (error) {
+                    console.error('Error fetching log file:', error);
+                    urlStatusDiv.innerHTML = `Failed to load from URL. Error: ${error.message}.<br>Loading default sample data instead.`;
+                    urlStatusDiv.classList.add('text-red-400');
+                    logInput.value = sampleLogData;
+                }
+            } else {
+                urlStatusDiv.textContent = 'No log file URL provided. Displaying sample data.';
+                logInput.value = sampleLogData;
+            }
+            // Automatically generate dashboard with whatever data was loaded
+            generateBtn.click();
+        };
+
+        // Call the function to load data when the script runs
+        loadInitialData();
+    </script>
+</body>
+</html>
+

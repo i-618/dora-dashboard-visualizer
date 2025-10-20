@@ -11,8 +11,8 @@
     <!-- jsPDF and html2canvas for PDF export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <!-- Showdown.js for Markdown rendering -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/2.1.0/showdown.min.js"></script>
+    <!-- marked.js for robust Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         /* Custom styles for a modern, light dashboard theme */
         body {
@@ -62,6 +62,23 @@
             padding: 0.125rem 0.25rem;
             border-radius: 0.25rem;
             font-family: monospace;
+        }
+        .markdown-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1rem;
+        }
+        .markdown-content th, .markdown-content td {
+            border: 1px solid #e5e7eb;
+            padding: 0.75rem;
+            text-align: left;
+        }
+        .markdown-content th {
+            background-color: #f9fafb;
+            font-weight: 600;
+        }
+        .markdown-content tr:nth-child(even) {
+            background-color: #f9fafb;
         }
     </style>
 </head>
@@ -265,7 +282,6 @@
          */
         const saveAsPdf = async () => {
             if (dashboard.children.length === 0) {
-                // Using a custom modal/alert in the future would be better than `alert`
                 alert("Please generate the dashboard first before saving as PDF.");
                 return;
             }
@@ -273,36 +289,42 @@
             loadingSpinner.classList.remove('hidden');
 
             try {
-                // Use the entire body for capture to include the definitions
+                // Use the entire content area for capture
                 const elementToCapture = document.querySelector('.max-w-7xl');
                 const canvas = await html2canvas(elementToCapture, { 
                     scale: 2,
                     useCORS: true,
-                    backgroundColor: '#f9fafb' // Ensure background is set
+                    backgroundColor: '#f9fafb'
                 });
                 
                 const imgData = canvas.toDataURL('image/png');
                 const { jsPDF } = window.jspdf;
                 
+                // Use 'p' for portrait, 'mm' for millimeters, 'a4' for size
                 const pdf = new jsPDF('p', 'mm', 'a4');
                 const pdfWidth = pdf.internal.pageSize.getWidth();
                 const pdfHeight = pdf.internal.pageSize.getHeight();
-                const ratio = canvas.width / canvas.height;
-                const imgHeight = pdfWidth / ratio;
-                let finalHeight = imgHeight;
+
+                const canvasWidth = canvas.width;
+                const canvasHeight = canvas.height;
+                const ratio = canvasWidth / canvasHeight;
+
+                const imgWidth = pdfWidth;
+                const imgHeight = imgWidth / ratio;
+
+                let heightLeft = imgHeight;
                 let position = 0;
 
-                // Handle content longer than one page
-                if (imgHeight > pdfHeight) {
-                    let pageCount = Math.ceil(imgHeight / pdfHeight);
-                    for (let i = 0; i < pageCount; i++) {
-                         if (i > 0) pdf.addPage();
-                         let sourceY = i * pdfHeight * (canvas.height / imgHeight);
-                         let sourceHeight = pdfHeight * (canvas.height / imgHeight);
-                         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight, undefined, 'FAST', sourceY, sourceHeight);
-                    }
-                } else {
-                     pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
+                // Add the first page
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pdfHeight;
+
+                // Add new pages if content is taller than one page
+                while (heightLeft > 0) {
+                  position = heightLeft - imgHeight; // Set a negative position to slide the image up
+                  pdf.addPage();
+                  pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                  heightLeft -= pdfHeight;
                 }
                 
                 pdf.save('dora_training_dashboard.pdf');
@@ -323,8 +345,8 @@
                 const response = await fetch('/dora-dashboard-visualizer/log_terms_definition.md');
                 if (!response.ok) throw new Error('Definitions file not found.');
                 const markdownText = await response.text();
-                const converter = new showdown.Converter();
-                definitionsContainer.innerHTML = converter.makeHtml(markdownText);
+                // Use marked.js to parse the markdown text
+                definitionsContainer.innerHTML = marked.parse(markdownText);
             } catch (error) {
                 console.warn("Could not load definitions file:", error);
                 definitionsContainer.innerHTML = '<h2>Metric Definitions</h2><p>Could not load the definitions file. Please ensure <code>log_terms_definition.md</code> is in the root directory.</p>';

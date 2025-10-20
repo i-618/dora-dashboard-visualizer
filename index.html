@@ -320,7 +320,7 @@
          */
         const loadAndDisplayMarkdown = async () => {
             try {
-                const response = await fetch('/log_terms_definition.md');
+                const response = await fetch('/dora-dashboard-visualizer/log_terms_definition.md');
                 if (!response.ok) throw new Error('Definitions file not found.');
                 const markdownText = await response.text();
                 const converter = new showdown.Converter();

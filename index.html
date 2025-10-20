@@ -11,25 +11,27 @@
     <!-- jsPDF and html2canvas for PDF export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Showdown.js for Markdown rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/2.1.0/showdown.min.js"></script>
     <style>
-        /* Custom styles for a modern, dark dashboard theme */
+        /* Custom styles for a modern, light dashboard theme */
         body {
-            background-color: #111827; /* dark gray */
-            color: #f3f4f6; /* light gray */
+            background-color: #f9fafb; /* light gray (gray-50) */
+            color: #1f2937; /* dark gray (gray-800) */
             font-family: 'Inter', sans-serif;
         }
         @import url('https://rsms.me/inter/inter.css');
-        .chart-container {
-            background-color: #1f2937; /* slightly lighter gray */
-            border: 1px solid #374151; /* even lighter gray for border */
+        .chart-container, .content-container {
+            background-color: #ffffff; /* white */
+            border: 1px solid #e5e7eb; /* lighter gray for border (gray-200) */
             border-radius: 0.75rem;
             padding: 1.5rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
             transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
         }
         .chart-container:hover {
             transform: translateY(-5px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
         }
         .btn {
             transition: all 0.3s ease;
@@ -37,14 +39,29 @@
         .btn:hover {
             transform: scale(1.05);
         }
-        /* Style for PDF export to ensure background is white */
-        .export-pdf {
-            background-color: #ffffff !important;
-            color: #000000 !important;
+        /* Styles for rendered markdown content */
+        .markdown-content h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 0.5rem;
         }
-        .export-pdf .chart-container {
-             background-color: #ffffff !important;
-             border: 1px solid #e5e7eb;
+         .markdown-content h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .markdown-content p {
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+        .markdown-content code {
+            background-color: #f3f4f6;
+            padding: 0.125rem 0.25rem;
+            border-radius: 0.25rem;
+            font-family: monospace;
         }
     </style>
 </head>
@@ -54,15 +71,15 @@
 
         <!-- Header Section -->
         <header class="text-center mb-8">
-            <h1 class="text-4xl sm:text-5xl font-bold text-white tracking-tight">Dora Training Log Dashboard</h1>
-            <p class="mt-2 text-lg text-gray-400">Paste your log data below to dynamically generate interactive charts.</p>
+            <h1 class="text-4xl sm:text-5xl font-bold text-gray-900 tracking-tight">Dora Training Log Dashboard</h1>
+            <p class="mt-2 text-lg text-gray-600">Paste your log data below or load from a URL to dynamically generate interactive charts.</p>
         </header>
 
         <!-- Input and Controls Section -->
-        <div class="bg-gray-800 p-6 rounded-xl shadow-lg mb-8">
-            <div id="url-status" class="mb-4 text-sm text-gray-400 rounded-md p-3 bg-gray-900 border border-gray-700"></div>
-            <label for="logInput" class="block text-sm font-medium text-gray-300 mb-2">Log Data:</label>
-            <textarea id="logInput" rows="10" class="w-full p-3 bg-gray-900 text-gray-200 border border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"></textarea>
+        <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200 mb-8">
+            <div id="url-status" class="mb-4 text-sm text-gray-600 rounded-md p-3 bg-gray-100 border border-gray-200"></div>
+            <label for="logInput" class="block text-sm font-medium text-gray-700 mb-2">Log Data:</label>
+            <textarea id="logInput" rows="10" class="w-full p-3 bg-white text-gray-800 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"></textarea>
             <div class="mt-4 flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
                 <button id="generateBtn" class="btn w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-md">
                     Generate Dashboard
@@ -75,17 +92,22 @@
         
         <!-- Loading Spinner -->
         <div id="loading" class="hidden text-center my-10">
-            <svg class="animate-spin h-8 w-8 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg class="animate-spin h-8 w-8 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <p class="mt-2 text-gray-400">Generating PDF...</p>
+            <p class="mt-2 text-gray-500">Generating PDF...</p>
         </div>
 
 
         <!-- Charts Dashboard Section -->
-        <div id="dashboard" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div id="dashboard" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
             <!-- Charts will be dynamically inserted here -->
+        </div>
+
+        <!-- Markdown Definitions Section -->
+        <div id="definitions-container" class="content-container markdown-content">
+             <!-- Definitions will be loaded here -->
         </div>
 
     </div>
@@ -97,8 +119,7 @@
 [09-24 16:05:30][flashy.solver][INFO] - Valid Summary | Epoch 16 | tf_loudnessratio=-0.011 | wm_detection_identity=0.851 | pesq=4.561 | max_mem=15.710 | l1=0.000 | mel=0.000 | sisnr=-32.823
 [09-24 16:25:05][flashy.solver][INFO] - Valid Summary | Epoch 17 | tf_loudnessratio=-0.009 | wm_detection_identity=0.859 | pesq=4.575 | max_mem=15.750 | l1=0.000 | mel=0.000 | sisnr=-31.995
 [09-24 16:45:55][flashy.solver][INFO] - Valid Summary | Epoch 18 | tf_loudnessratio=-0.008 | wm_detection_identity=0.863 | pesq=4.582 | max_mem=15.801 | l1=0.000 | mel=0.000 | sisnr=-30.150`;
-        document.getElementById('logInput').value = sampleLogData;
-
+        
         // --- Global Variables ---
         let charts = []; // To keep track of chart instances for destruction
         const generateBtn = document.getElementById('generateBtn');
@@ -107,12 +128,13 @@
         const logInput = document.getElementById('logInput');
         const loadingSpinner = document.getElementById('loading');
         const urlStatusDiv = document.getElementById('url-status');
+        const definitionsContainer = document.getElementById('definitions-container');
 
 
         // --- Chart Color Palette ---
         const chartColors = [
-            '#3498db', '#e74c3c', '#9b59b6', '#2ecc71', '#f1c40f', 
-            '#1abc9c', '#d35400', '#34495e', '#c0392b', '#8e44ad'
+            '#4f46e5', '#db2777', '#9333ea', '#16a34a', '#ca8a04', 
+            '#0d9488', '#d97706', '#475569', '#be123c', '#7e22ce'
         ];
 
         /**
@@ -132,6 +154,8 @@
                 if (!epochMatch) return;
 
                 const epoch = parseInt(epochMatch[1], 10);
+                // Avoid duplicate epochs if logs have repeated lines
+                if (data.labels.includes(epoch)) return;
                 data.labels.push(epoch);
 
                 const parts = line.split('|').slice(2); // Skip timestamp and Epoch part
@@ -142,22 +166,21 @@
                         const value = parseFloat(kv[1]);
                         if (!isNaN(value)) {
                             if (!data.datasets[key]) {
-                                data.datasets[key] = [];
+                                data.datasets[key] = {};
                             }
-                            // This logic assumes logs are ordered, which they should be.
-                            // For robustness, one could match data points to epochs more explicitly.
-                            data.datasets[key].push(value);
+                            data.datasets[key][epoch] = value;
                         }
                     }
                 });
             });
             
-            // Sort labels and corresponding data points to handle out-of-order logs
-            const sortedIndices = data.labels.map((_, i) => i).sort((a, b) => data.labels[a] - data.labels[b]);
+            // Sort labels and ensure data aligns
             data.labels.sort((a, b) => a - b);
+            const finalDatasets = {};
             for (const key in data.datasets) {
-                data.datasets[key] = sortedIndices.map(i => data.datasets[key][i]);
+                 finalDatasets[key] = data.labels.map(epoch => data.datasets[key][epoch] !== undefined ? data.datasets[key][epoch] : null);
             }
+            data.datasets = finalDatasets;
 
             return data;
         };
@@ -167,13 +190,12 @@
          * @param {object} data - The structured data from parseLogs.
          */
         const createDashboard = (data) => {
-            // Destroy old charts before creating new ones
             charts.forEach(chart => chart.destroy());
             charts = [];
             dashboard.innerHTML = '';
 
             if (Object.keys(data.datasets).length === 0) {
-                 dashboard.innerHTML = `<div class="col-span-1 md:col-span-2 xl:col-span-3 text-center py-10"><p class="text-gray-400">No valid data found to create charts. Please check the log format.</p></div>`;
+                 dashboard.innerHTML = `<div class="col-span-1 md:col-span-2 xl:col-span-3 text-center py-10"><p class="text-gray-500">No valid data found to create charts. Please check the log format.</p></div>`;
                  return;
             }
 
@@ -181,7 +203,6 @@
             for (const key in data.datasets) {
                 const chartWrapper = document.createElement('div');
                 chartWrapper.className = 'chart-container';
-
                 const canvas = document.createElement('canvas');
                 chartWrapper.appendChild(canvas);
                 dashboard.appendChild(chartWrapper);
@@ -197,7 +218,7 @@
                             label: key,
                             data: data.datasets[key],
                             borderColor: chartColor,
-                            backgroundColor: chartColor + '33', // semi-transparent fill
+                            backgroundColor: chartColor + '33',
                             fill: true,
                             tension: 0.3,
                             borderWidth: 2,
@@ -212,38 +233,25 @@
                             legend: {
                                 display: true,
                                 position: 'top',
-                                labels: {
-                                    color: '#e5e7eb', // legend text color
-                                    font: { size: 14 }
-                                }
+                                labels: { color: '#374151', font: { size: 14 } }
                             },
                             title: {
                                 display: true,
-                                text: key.replace(/_/g, ' ').toUpperCase(), // Format title
-                                color: '#f9fafb', // title text color
+                                text: key.replace(/_/g, ' ').toUpperCase(),
+                                color: '#111827',
                                 font: { size: 18, weight: 'bold' }
                             }
                         },
                         scales: {
                             x: {
-                                title: {
-                                    display: true,
-                                    text: 'Epoch',
-                                    color: '#9ca3af',
-                                    font: { size: 12 }
-                                },
-                                ticks: { color: '#9ca3af' },
-                                grid: { color: '#374151' }
+                                title: { display: true, text: 'Epoch', color: '#6b7280', font: { size: 12 } },
+                                ticks: { color: '#6b7280' },
+                                grid: { color: '#e5e7eb' }
                             },
                             y: {
-                                title: {
-                                    display: true,
-                                    text: 'Value',
-                                    color: '#9ca3af',
-                                    font: { size: 12 }
-                                },
-                                ticks: { color: '#9ca3af' },
-                                grid: { color: '#374151' }
+                                title: { display: true, text: 'Value', color: '#6b7280', font: { size: 12 } },
+                                ticks: { color: '#6b7280' },
+                                grid: { color: '#e5e7eb' }
                             }
                         }
                     }
@@ -257,55 +265,69 @@
          */
         const saveAsPdf = async () => {
             if (dashboard.children.length === 0) {
+                // Using a custom modal/alert in the future would be better than `alert`
                 alert("Please generate the dashboard first before saving as PDF.");
                 return;
             }
 
             loadingSpinner.classList.remove('hidden');
-            document.body.classList.add('export-pdf');
-
-            // Give the browser a moment to apply the class change
-            await new Promise(resolve => setTimeout(resolve, 100));
 
             try {
-                const canvas = await html2canvas(dashboard, { 
-                    scale: 2, // Increase resolution for better quality
-                    useCORS: true 
+                // Use the entire body for capture to include the definitions
+                const elementToCapture = document.querySelector('.max-w-7xl');
+                const canvas = await html2canvas(elementToCapture, { 
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#f9fafb' // Ensure background is set
                 });
                 
                 const imgData = canvas.toDataURL('image/png');
                 const { jsPDF } = window.jspdf;
                 
-                // Determine PDF orientation based on dashboard width
-                const pdf = dashboard.scrollWidth > dashboard.scrollHeight 
-                    ? new jsPDF('l', 'mm', 'a4') 
-                    : new jsPDF('p', 'mm', 'a4');
-                
+                const pdf = new jsPDF('p', 'mm', 'a4');
                 const pdfWidth = pdf.internal.pageSize.getWidth();
                 const pdfHeight = pdf.internal.pageSize.getHeight();
-                const canvasWidth = canvas.width;
-                const canvasHeight = canvas.height;
-                const ratio = canvasWidth / canvasHeight;
+                const ratio = canvas.width / canvas.height;
+                const imgHeight = pdfWidth / ratio;
+                let finalHeight = imgHeight;
+                let position = 0;
 
-                let imgWidth = pdfWidth - 20; // with margin
-                let imgHeight = imgWidth / ratio;
-
-                if (imgHeight > pdfHeight - 20) {
-                    imgHeight = pdfHeight - 20;
-                    imgWidth = imgHeight * ratio;
+                // Handle content longer than one page
+                if (imgHeight > pdfHeight) {
+                    let pageCount = Math.ceil(imgHeight / pdfHeight);
+                    for (let i = 0; i < pageCount; i++) {
+                         if (i > 0) pdf.addPage();
+                         let sourceY = i * pdfHeight * (canvas.height / imgHeight);
+                         let sourceHeight = pdfHeight * (canvas.height / imgHeight);
+                         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight, undefined, 'FAST', sourceY, sourceHeight);
+                    }
+                } else {
+                     pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
                 }
                 
-                const x = (pdfWidth - imgWidth) / 2;
-                const y = (pdfHeight - imgHeight) / 2;
-
-                pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
                 pdf.save('dora_training_dashboard.pdf');
+
             } catch (error) {
                 console.error("Error generating PDF:", error);
                 alert("An error occurred while generating the PDF. Please check the console for details.");
             } finally {
-                document.body.classList.remove('export-pdf');
                 loadingSpinner.classList.add('hidden');
+            }
+        };
+        
+        /**
+         * Fetches and displays the markdown definitions file.
+         */
+        const loadAndDisplayMarkdown = async () => {
+            try {
+                const response = await fetch('/log_terms_definition.md');
+                if (!response.ok) throw new Error('Definitions file not found.');
+                const markdownText = await response.text();
+                const converter = new showdown.Converter();
+                definitionsContainer.innerHTML = converter.makeHtml(markdownText);
+            } catch (error) {
+                console.warn("Could not load definitions file:", error);
+                definitionsContainer.innerHTML = '<h2>Metric Definitions</h2><p>Could not load the definitions file. Please ensure <code>log_terms_definition.md</code> is in the root directory.</p>';
             }
         };
 
@@ -318,11 +340,6 @@
         savePdfBtn.addEventListener('click', saveAsPdf);
 
         // --- Initial Load ---
-        /**
-         * Checks for a 'logFile' URL parameter on page load.
-         * If found, it fetches the log file from the URL.
-         * Otherwise, it loads the default sample data.
-         */
         const loadInitialData = async () => {
             const params = new URLSearchParams(window.location.search);
             const logFileUrl = params.get('logFile');
@@ -331,29 +348,25 @@
                 urlStatusDiv.textContent = `Attempting to load log file from: ${logFileUrl}`;
                 try {
                     const response = await fetch(logFileUrl);
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     const logText = await response.text();
                     logInput.value = logText;
                     urlStatusDiv.textContent = `Successfully loaded data from: ${logFileUrl}`;
-                    urlStatusDiv.classList.add('text-green-400');
-
+                    urlStatusDiv.classList.add('text-green-600');
                 } catch (error) {
                     console.error('Error fetching log file:', error);
                     urlStatusDiv.innerHTML = `Failed to load from URL. Error: ${error.message}.<br>Loading default sample data instead.`;
-                    urlStatusDiv.classList.add('text-red-400');
+                    urlStatusDiv.classList.add('text-red-600');
                     logInput.value = sampleLogData;
                 }
             } else {
                 urlStatusDiv.textContent = 'No log file URL provided. Displaying sample data.';
                 logInput.value = sampleLogData;
             }
-            // Automatically generate dashboard with whatever data was loaded
             generateBtn.click();
+            loadAndDisplayMarkdown(); // Load definitions after loading log data
         };
 
-        // Call the function to load data when the script runs
         loadInitialData();
     </script>
 </body>

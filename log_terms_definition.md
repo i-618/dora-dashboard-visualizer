@@ -7,9 +7,9 @@
 To monitor the health and efficacy of the Watermark model during training, focus on these four categories of metrics:
 
 1.  **Generator Loss (`g_loss`):** This must trend **downwards**. It indicates the generator's success in creating high-quality, watermarked audio that fools the discriminator while maintaining perceptual quality and successfully embedding the watermark.
-2.  **Watermark Detection Identity (`wm_detection_identity`):** This should be **high (near 1.0 or 100%)** and **stable** (in this case it should remain **low/stable** if reported as loss) . It measures the detector's ability to reliably find the watermark in *undistorted* watermarked audio. This is the baseline success metric.
+2.  **Watermark Detection Identity (`wm_detection_identity`):** This should be **low/stable** as its reported as loss (else accuracy value should be **high (near 1.0 or 100%)** and **stable**) . It measures the detector's ability to reliably find the watermark in *undistorted* watermarked audio. This is the baseline success metric.
 3.  **Robustness Message Bit Error Rate (`wm_mb_X` terms, e.g., `wm_mb_identity`, `wm_mb_mp3_compression`):** This should be **low (near 0.0)**. It measures the message decoding error after common attacks like MP3 compression or filtering. A low value means the embedded message is robustly recoverable.
-4.  **Audio Quality Metrics (`pesq`, `sisnr`):** These should remain **high** or **improve**. These metrics ensure the watermark is **imperceptible** and is not degrading the listener's experience.
+4.  **Audio Quality Metrics (`pesq`, `sisnr`):** These should remain **high** or **improve**. These metrics ensure the watermark is **imperceptible** and does not degrade the listener's experience.
 
 ---
 
